@@ -42,16 +42,20 @@ def scrape_channel(
       db.update_channel_name(handle, display_name)
 
     entries = info.get("entries", [])
+    scraped_ids = set()
     for entry in entries:
       if not entry:
         continue
 
       video_id = entry.get("id")
-      thumbnail_url = entry.get("thumbnail")
+      if not video_id:
+        continue
 
-      # Fallback for flat extraction missing thumbnails
-      if not thumbnail_url and video_id:
-        thumbnail_url = f"https://i.ytimg.com/vi/{video_id}/hqdefault.jpg"
+      scraped_ids.add(video_id)
+
+      # Always use canonical URL — yt-dlp flat extraction returns storyboard
+      # sprite sheets, not the actual video thumbnail
+      thumbnail_url = f"https://i.ytimg.com/vi/{video_id}/hqdefault.jpg"
 
       db.process_scraped_video(
         scrape_id=scrape_uuid,
@@ -64,6 +68,9 @@ def scrape_channel(
         duration=entry.get("duration"),
         record_uuid=str(uuid.uuid4()),
       )
+
+    # Detect deleted/unlisted videos (present in DB, absent from this scrape)
+    db.mark_missing_videos_deleted(scrape_uuid, handle, scraped_ids)
 
     db.log_channel_scrape_result(scrape_uuid, handle, "SUCCESS", len(entries))
     if is_standalone:
@@ -96,18 +103,18 @@ def audit_session_thumbnails(scrape_uuid: str):
       return
 
     # 2. Compare and Update/Archive
-    if phash != old_hash:
-      # It's a new visual version!
+    if old_hash is None:
+      # First time seeing this video's visual — just store the fingerprint
+      db.update_video_visuals(video_uuid, phash, etag)
+    elif phash != old_hash:
+      # Genuine visual drift — create a new immutable version
       print(f"    📸 Visual drift detected for {video_id}")
       new_uuid = str(uuid.uuid4())
       fingerprinter.archive_thumbnail(video_id, phash, content)
       db.promote_video_to_new_version(
         scrape_uuid, video_uuid, new_uuid, phash, etag
       )
-    else:
-      # Same visual, just update the hash/etag if they were missing
-      if not old_hash:
-        db.update_video_visuals(video_uuid, phash, etag)
+    # else: hash matches, nothing to do
 
   # Use parallel workers for high-speed audit
   with ThreadPoolExecutor(max_workers=20) as executor:

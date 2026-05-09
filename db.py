@@ -193,12 +193,14 @@ def get_video_records_df() -> pd.DataFrame:
   connection = get_connection()
   df = pd.read_sql_query(
     """
-    SELECT v.thumbnail_url, 'https://youtube.com/watch?v=' || v.video_id AS
-           video_url, c.name AS channel_name, c.handle AS channel_handle,
+    SELECT v.video_id, v.thumbnail_url,
+           'https://youtube.com/watch?v=' || v.video_id AS video_url,
+           c.name AS channel_name, c.handle AS channel_handle,
            v.title, v.duration_sec, v.uuid as record_id, v.status,
            v.created_at AS recorded_at
     FROM videos v
     JOIN channels c ON v.channel_uuid = c.uuid
+    WHERE c.deleted_at IS NULL
     ORDER BY v.created_at DESC
     """,
     connection,
@@ -294,6 +296,57 @@ def log_channel_scrape_result(
     connection.commit()
   except sqlite3.DatabaseError as e:
     print(f"Error logging channel result: {e}")
+  finally:
+    connection.close()
+
+
+def mark_missing_videos_deleted(
+  scrape_id: str, handle: str, scraped_ids: set
+) -> None:
+  """Detects videos previously seen on a channel that are absent from the
+  latest scrape, and creates a new DELETED version record for each."""
+  connection = get_connection()
+  cursor = connection.cursor()
+  try:
+    # Get video_ids for this channel whose LATEST record is not DELETED
+    cursor.execute(
+      """SELECT DISTINCT v.video_id
+         FROM videos v
+         JOIN channels c ON v.channel_uuid = c.uuid
+         WHERE c.handle = ?
+           AND v.created_at = (
+             SELECT MAX(v2.created_at) FROM videos v2
+             WHERE v2.video_id = v.video_id
+           )
+           AND v.status != 'DELETED'""",
+      (handle,),
+    )
+    known_ids = {row[0] for row in cursor.fetchall()}
+    missing_ids = known_ids - scraped_ids
+
+    for video_id in missing_ids:
+      print(f"    🗑️ Video removed/unlisted: {video_id}")
+      new_uuid = str(uuid.uuid4())
+      cursor.execute(
+        """INSERT INTO videos
+           (uuid, video_id, channel_uuid, title, description, thumbnail_url,
+            status, duration_sec, published_date, is_change)
+           SELECT ?, video_id, channel_uuid, title, description, thumbnail_url,
+                  'DELETED', duration_sec, published_date, 1
+           FROM videos WHERE uuid = (
+             SELECT uuid FROM videos
+             WHERE video_id = ?
+             ORDER BY created_at DESC LIMIT 1
+           )""",
+        (new_uuid, video_id),
+      )
+      cursor.execute(
+        "INSERT INTO scrape_videos (scrape_id, video_uuid) VALUES (?, ?)",
+        (scrape_id, new_uuid),
+      )
+
+    if missing_ids:
+      connection.commit()
   finally:
     connection.close()
 
