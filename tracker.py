@@ -79,7 +79,7 @@ def scrape_channel(handle: str, limit: Optional[int] = None) -> None:
   url = f"https://www.youtube.com/{handle}/videos"
 
   ydl_opts = {
-    "extract_flat": False,
+    "extract_flat": "in_playlist",
     "skip_download": True,
     "quiet": True,
     "no_warnings": True,

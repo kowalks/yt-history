@@ -8,6 +8,8 @@ import sqlite3
 import pandas as pd
 import streamlit as st
 
+import tracker
+
 DB_FILE = "history.db"
 
 st.set_page_config(page_title="YouTube History Tracker", layout="wide")
@@ -86,3 +88,55 @@ elif menu == "Snapshots":
     width="stretch",
   )
   connection.close()
+
+elif menu == "Scraper Controls":
+  st.header("Scraper Controls")
+  st.write(
+    "Trigger the backend scraping algorithms directly from this interface."
+  )
+
+  st.subheader("1. Add New Channel", divider="gray")
+  new_handle = st.text_input("YouTube Handle (e.g., @mkbhd)")
+  if st.button("Add Channel"):
+    if new_handle:
+      tracker.add_channel(new_handle)
+      st.success(f"Added {new_handle} to the database. You can now scrape it!")
+    else:
+      st.error("Please enter a valid YouTube handle.")
+
+  st.subheader("2. Trigger Scraping Action", divider="gray")
+  connection = get_db_connection()
+  channels_df = pd.read_sql_query(
+    "SELECT handle, name FROM channels", connection
+  )
+  connection.close()
+
+  handles_list = channels_df["handle"].tolist()
+
+  if not handles_list:
+    st.warning("No channels active. Add a channel above first.")
+  else:
+    scrape_options = ["All Channels"] + handles_list
+    selected_option = st.selectbox("Select Target", scrape_options)
+
+    limit_val = st.number_input(
+      "Maximum videos to scrape (0 for all historical archive)",
+      min_value=0,
+      value=10,
+      step=10,
+    )
+
+    if st.button("Run Scraper", type="primary"):
+      final_limit = None if limit_val == 0 else limit_val
+
+      if selected_option == "All Channels":
+        with st.spinner(
+          "Scraping all registered channels... This may take a while depending on limits."
+        ):
+          for h in handles_list:
+            tracker.scrape_channel(h, limit=final_limit)
+        st.success("Successfully completed scraping all channels!")
+      else:
+        with st.spinner(f"Scraping '{selected_option}'..."):
+          tracker.scrape_channel(selected_option, limit=final_limit)
+        st.success(f"Successfully scraped {selected_option}!")
