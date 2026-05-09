@@ -6,14 +6,13 @@ import db
 def show():
   st.header("Intelligence Dashboard")
 
-  # Background Activity Check
-  scrapes_df = db.get_scrapes_df()
-  active_scrapes = scrapes_df[scrapes_df["status"] == "RUNNING"]
+  # Background Activity Check — query the session table directly
+  active_scrapes = db.get_active_sessions_df()
   if not active_scrapes.empty:
     with st.status("🛠️ Intelligence Gathering in Progress...", expanded=True):
       for _, row in active_scrapes.iterrows():
         st.write(
-          f"Scrape Session `{row['scrape_id'][:8]}` started at `{row['started_at']}`"
+          f"Scrape Session `{row['id'][:8]}` started at `{row['started_at']}`"
         )
       st.button("Refresh Progress")
 

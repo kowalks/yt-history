@@ -10,14 +10,13 @@ def show():
   dataframe = db.get_channels_df()
 
   # Background Activity Check
-  scrapes_df = db.get_scrapes_df()
-  active_scrapes = scrapes_df[scrapes_df["status"] == "RUNNING"]
+  active_scrapes = db.get_active_sessions_df()
   if not active_scrapes.empty:
-      with st.status("🛠️ Intelligence Gathering in Progress...", expanded=False):
-          for _, row in active_scrapes.iterrows():
-              st.write(f"Session `{row['scrape_id'][:8]}` active...")
-          if st.button("Refresh UI Status"):
-              st.rerun()
+    with st.status("🛠️ Intelligence Gathering in Progress...", expanded=False):
+      for _, row in active_scrapes.iterrows():
+        st.write(f"Session `{row['id'][:8]}` active...")
+      if st.button("Refresh UI Status"):
+        st.rerun()
 
   if not dataframe.empty:
     if st.button("🚀 Scrape All Channels", use_container_width=True):

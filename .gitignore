@@ -7,9 +7,9 @@ venv/
 __pycache__/
 *.pyc
 
-# Database
-*.sqlite3
-*.db
+# Database & local data
+data/history.db
+data/thumbnails/
 
 # Logs
 *.log

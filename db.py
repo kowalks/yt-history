@@ -5,7 +5,7 @@ from typing import Optional
 
 import pandas as pd
 
-DB_FILE = os.path.join(os.path.dirname(__file__), "history.db")
+DB_FILE = os.path.join(os.path.dirname(__file__), "data", "history.db")
 
 
 def normalize_handle(handle: str) -> str:
@@ -39,6 +39,8 @@ def init_db() -> None:
         title TEXT,
         description TEXT,
         thumbnail_url TEXT,
+        thumbnail_hash TEXT,
+        thumbnail_etag TEXT,
         status TEXT,
         duration_sec INTEGER,
         published_date TEXT,
@@ -205,12 +207,23 @@ def get_video_records_df() -> pd.DataFrame:
   return df
 
 
+def get_active_sessions_df() -> pd.DataFrame:
+  """Returns scrape sessions currently in RUNNING status."""
+  connection = get_connection()
+  df = pd.read_sql_query(
+    "SELECT id, started_at FROM scrapes WHERE status = 'RUNNING'",
+    connection,
+  )
+  connection.close()
+  return df
+
+
 def get_scrapes_df() -> pd.DataFrame:
   """Returns a detailed log of every channel-scrape event."""
   connection = get_connection()
   df = pd.read_sql_query(
     """
-    SELECT 
+    SELECT
         sc.scrape_id,
         c.name as channel_name,
         sc.video_count,
@@ -273,7 +286,7 @@ def log_channel_scrape_result(
     channel_uuid = row[0] if row else None
 
     cursor.execute(
-      """INSERT INTO scrape_channels (scrape_id, channel_uuid, status, 
+      """INSERT INTO scrape_channels (scrape_id, channel_uuid, status,
          video_count)
          VALUES (?, ?, ?, ?)""",
       (scrape_id, channel_uuid, status, video_count),
@@ -335,8 +348,8 @@ def process_scraped_video(
       cursor.execute(
         """INSERT INTO videos
            (uuid, video_id, channel_uuid, title, description, thumbnail_url,
-            status, duration_sec, published_date, is_change)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            status, duration_sec, published_date, is_change, thumbnail_hash, thumbnail_etag)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (
           final_uuid,
           video_id,
@@ -348,6 +361,8 @@ def process_scraped_video(
           duration,
           upload_date,
           is_change,
+          None,
+          None,
         ),
       )
 
@@ -363,6 +378,20 @@ def process_scraped_video(
     connection.close()
 
 
+def update_video_visuals(
+  video_uuid: str, thumbnail_hash: str, thumbnail_etag: str
+) -> None:
+  """Updates a specific video version with its visual fingerprint."""
+  connection = get_connection()
+  cursor = connection.cursor()
+  cursor.execute(
+    "UPDATE videos SET thumbnail_hash = ?, thumbnail_etag = ? WHERE uuid = ?",
+    (thumbnail_hash, thumbnail_etag, video_uuid),
+  )
+  connection.commit()
+  connection.close()
+
+
 def get_metadata_changes_df() -> pd.DataFrame:
   """Finds videos with changed metadata using the is_change flag."""
   connection = get_connection()
@@ -375,11 +404,13 @@ def get_metadata_changes_df() -> pd.DataFrame:
         prev.title as prev_title,
         prev.description as prev_description,
         prev.status as prev_status,
+        prev.thumbnail_hash as prev_thumb_hash,
         v.uuid as record_id
     FROM videos v
     JOIN channels c ON v.channel_uuid = c.uuid
     LEFT JOIN (
-        SELECT video_id, title, description, status, created_at,
+        SELECT video_id, title, description, status,
+               thumbnail_hash, created_at,
                ROW_NUMBER() OVER (
                  PARTITION BY video_id ORDER BY created_at DESC
                ) as rn
@@ -421,3 +452,48 @@ def finalize_scrape(scrape_id: str, status: str = "SUCCESS") -> None:
   connection.close()
   print(f"🏁 Scrape session {scrape_id} finalized: {status}")
   print(f"   📊 Total: {total or 0} videos | Changes detected: {changes or 0}")
+
+
+def promote_video_to_new_version(
+  scrape_id: str, old_uuid: str, new_uuid: str, thumb_hash: str, thumb_etag: str
+) -> None:
+  """Creates a new version of a video because of a visual change."""
+  connection = get_connection()
+  cursor = connection.cursor()
+  try:
+    # 1. Copy the row with new ID and visual info
+    cursor.execute(
+      """INSERT INTO videos
+               (uuid, video_id, channel_uuid, title, description, thumbnail_url,
+                status, duration_sec, published_date, is_change,
+                thumbnail_hash, thumbnail_etag)
+               SELECT ?, video_id, channel_uuid, title, description, thumbnail_url,
+                      status, duration_sec, published_date, 1, ?, ?
+               FROM videos WHERE uuid = ?""",
+      (new_uuid, thumb_hash, thumb_etag, old_uuid),
+    )
+    # 2. Update the scrape link to point to the new version
+    cursor.execute(
+      "UPDATE scrape_videos SET video_uuid = ? WHERE scrape_id = ? AND video_uuid = ?",
+      (new_uuid, scrape_id, old_uuid),
+    )
+    connection.commit()
+  finally:
+    connection.close()
+
+
+def get_scrape_videos_with_visuals(scrape_id: str) -> pd.DataFrame:
+  """Retrieve videos in a scrape session along with their current visual fingerprints."""
+  connection = get_connection()
+  df = pd.read_sql_query(
+    """
+        SELECT sv.video_uuid, v.video_id, v.thumbnail_url, v.thumbnail_hash, v.thumbnail_etag
+        FROM scrape_videos sv
+        JOIN videos v ON sv.video_uuid = v.uuid
+        WHERE sv.scrape_id = ?
+        """,
+    connection,
+    params=(scrape_id,),
+  )
+  connection.close()
+  return df
