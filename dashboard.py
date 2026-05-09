@@ -3,7 +3,11 @@
 This module renders the frontend relying on the internal db API.
 """
 
+from pathlib import Path
+
 import streamlit as st
+
+import db
 
 st.set_page_config(
   page_title="YouTube History Tracker", page_icon="🕵️‍♂️", layout="wide"
@@ -31,5 +35,9 @@ pg = st.navigation(
     st.Page("views/history.py", title="History Log", icon="📜"),
   ]
 )
+
+if not Path(db.DB_FILE).exists():
+  print(f"💾 No database found, initializing at {db.DB_FILE}")
+  db.init_db()
 
 pg.run()
