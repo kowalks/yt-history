@@ -22,6 +22,7 @@ numpy==2.4.4
 packaging==26.2
 pandas==3.0.2
 pillow==12.2.0
+platformdirs==4.9.6
 pluggy==1.6.0
 protobuf==7.34.1
 pyarrow==24.0.0
@@ -31,6 +32,7 @@ python-multipart==0.0.27
 referencing==0.37.0
 requests==2.33.1
 rpds-py==0.30.0
+ruff==0.15.12
 six==1.17.0
 smmap==5.0.3
 sqlite-fts4==1.0.3
@@ -45,4 +47,5 @@ urllib3==2.7.0
 uvicorn==0.46.0
 watchdog==6.0.0
 websockets==16.0
+yapf==0.43.0
 yt-dlp==2026.3.17
