@@ -1,10 +1,7 @@
-"""YouTube History Tracker module for scraping metadata.
-
-This module initializes the database, tracks channels, and fetches
-historical representations of YouTube videos over time.
-"""
+"""YouTube History Tracker module for scraping metadata."""
 
 import sqlite3
+import uuid
 from typing import Optional
 
 import yt_dlp
@@ -13,10 +10,7 @@ DB_FILE = "history.db"
 
 
 def init_db() -> None:
-  """Initializes the SQLite database with necessary tables.
-
-  Creates channels, videos, and video_snapshots tables if they do not exist.
-  """
+  """Initializes the SQLite database with necessary tables."""
   connection = sqlite3.connect(DB_FILE)
   cursor = connection.cursor()
   cursor.executescript("""
@@ -35,14 +29,29 @@ def init_db() -> None:
         first_seen_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
 
-    CREATE TABLE IF NOT EXISTS video_snapshots (
+    CREATE TABLE IF NOT EXISTS video_versions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         video_id TEXT,
-        retrieved_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        version_num INTEGER,
         title TEXT,
         description TEXT,
         thumbnail_url TEXT,
         status TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(video_id) REFERENCES videos(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS scrapes (
+        id TEXT PRIMARY KEY,
+        channel_handle TEXT,
+        started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS scrape_videos (
+        scrape_id TEXT,
+        video_id TEXT,
+        version_num INTEGER,
+        FOREIGN KEY(scrape_id) REFERENCES scrapes(id),
         FOREIGN KEY(video_id) REFERENCES videos(id)
     );
     """)
@@ -51,11 +60,7 @@ def init_db() -> None:
 
 
 def add_channel(handle: str) -> None:
-  """Adds a new YouTube channel to track.
-
-  Args:
-      handle: The YouTube handle (e.g., '@PrimoRico').
-  """
+  """Adds a new YouTube channel to track."""
   connection = sqlite3.connect(DB_FILE)
   cursor = connection.cursor()
   try:
@@ -68,15 +73,7 @@ def add_channel(handle: str) -> None:
 
 
 def scrape_channel(handle: str, limit: Optional[int] = None) -> None:
-  """Scrapes video metadata for the given channel handle.
-
-  Fetches video titles, descriptions, thumbnails, and status to
-  check if there is a divergence from the tracked history.
-
-  Args:
-      handle: The YouTube handle to scrape.
-      limit: An optional restriction on how many recent videos to scrape.
-  """
+  """Scrapes video metadata for the given channel handle."""
   url = f"https://www.youtube.com/{handle}/videos"
 
   ydl_opts = {
@@ -115,6 +112,12 @@ def scrape_channel(handle: str, limit: Optional[int] = None) -> None:
     cursor.execute(
       "UPDATE channels SET name = ? WHERE handle = ?", (channel_name, handle)
     )
+
+    scrape_id = str(uuid.uuid4())
+    cursor.execute(
+      "INSERT INTO scrapes (id, channel_handle) VALUES (?, ?)",
+      (scrape_id, handle),
+    )
     connection.commit()
 
     for entry in entries:
@@ -150,33 +153,45 @@ def scrape_channel(handle: str, limit: Optional[int] = None) -> None:
         )
 
         cursor.execute(
-          """SELECT title, description, thumbnail_url, status
-                       FROM video_snapshots
-                       WHERE video_id = ?
-                       ORDER BY retrieved_at DESC LIMIT 1""",
-          (video_id,),
+          """SELECT version_num
+             FROM video_versions
+             WHERE video_id = ? AND title = ? AND description = ? AND thumbnail_url = ? AND status = ?
+             LIMIT 1""",
+          (video_id, video_title, video_desc, video_thumb, status),
         )
-        latest = cursor.fetchone()
+        existing_version = cursor.fetchone()
 
-        changed = False
-        if not latest:
-          changed = True
+        if existing_version:
+          version_num = existing_version[0]
         else:
-          if (
-            latest[0] != video_title
-            or latest[1] != video_desc
-            or latest[2] != video_thumb
-            or latest[3] != status
-          ):
-            changed = True
-
-        if changed:
-          print(f"New snapshot saved for video: {video_id} - '{video_title}'")
           cursor.execute(
-            """INSERT INTO video_snapshots (video_id, title, description, thumbnail_url, status)
-                           VALUES (?, ?, ?, ?, ?)""",
-            (video_id, video_title, video_desc, video_thumb, status),
+            "SELECT MAX(version_num) FROM video_versions WHERE video_id = ?",
+            (video_id,),
           )
+          max_v = cursor.fetchone()[0]
+          version_num = (max_v or 0) + 1
+
+          print(
+            f"New version ({version_num}) saved for video: {video_id} - '{video_title}'"
+          )
+          cursor.execute(
+            """INSERT INTO video_versions (video_id, version_num, title, description, thumbnail_url, status)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (
+              video_id,
+              version_num,
+              video_title,
+              video_desc,
+              video_thumb,
+              status,
+            ),
+          )
+
+        cursor.execute(
+          "INSERT INTO scrape_videos (scrape_id, video_id, version_num) VALUES (?, ?, ?)",
+          (scrape_id, video_id, version_num),
+        )
+
         connection.commit()
       except sqlite3.DatabaseError as db_error:
         print(f"Database error for video {video_id}: {db_error}")

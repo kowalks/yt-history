@@ -17,16 +17,13 @@ st.title("📹 YouTube History Tracker")
 
 st.sidebar.header("Navigation")
 menu = st.sidebar.radio(
-  "Go to", ["Dashboard", "Channels", "Snapshots", "Scraper Controls"]
+  "Go to",
+  ["Dashboard", "Channels", "Video Versions", "Scrapes", "Scraper Controls"],
 )
 
 
 def get_db_connection() -> sqlite3.Connection:
-  """Creates and returns a connection to the SQLite history database.
-
-  Returns:
-      A valid connection object pointing to DB_FILE.
-  """
+  """Creates and returns a connection to the SQLite history database."""
   return sqlite3.connect(DB_FILE)
 
 
@@ -42,13 +39,13 @@ if menu == "Dashboard":
   cursor.execute("SELECT count(*) FROM videos")
   videos_count = cursor.fetchone()[0]
 
-  cursor.execute("SELECT count(*) FROM video_snapshots")
+  cursor.execute("SELECT count(*) FROM video_versions")
   snapshots_count = cursor.fetchone()[0]
 
   col1, col2, col3 = st.columns(3)
   col1.metric("Channels Watched", channels_count)
   col2.metric("Videos Tracked", videos_count)
-  col3.metric("Snapshots Recorded", snapshots_count)
+  col3.metric("Total Video Versions", snapshots_count)
 
   connection.close()
 
@@ -59,16 +56,16 @@ elif menu == "Channels":
   st.dataframe(dataframe)
   connection.close()
 
-elif menu == "Snapshots":
-  st.header("Video Snapshots (History Log)")
+elif menu == "Video Versions":
+  st.header("Video Versions (History Log)")
   connection = get_db_connection()
   dataframe = pd.read_sql_query(
     """
-        SELECT vs.thumbnail_url, 'https://youtube.com/watch?v=' || vs.video_id AS video_url,
-               v.channel_handle, vs.title, v.duration_sec, vs.status, vs.retrieved_at
-        FROM video_snapshots vs
-        JOIN videos v ON v.id = vs.video_id
-        ORDER BY vs.retrieved_at DESC
+        SELECT vv.thumbnail_url, 'https://youtube.com/watch?v=' || vv.video_id AS video_url,
+               v.channel_handle, vv.title, v.duration_sec, vv.version_num, vv.status, vv.created_at AS recorded_at
+        FROM video_versions vv
+        JOIN videos v ON v.id = vv.video_id
+        ORDER BY vv.created_at DESC
     """,
     connection,
   )
@@ -85,15 +82,34 @@ elif menu == "Snapshots":
       "duration_sec": st.column_config.NumberColumn(
         "Duration (s)", format="%d"
       ),
-      "view_count": st.column_config.NumberColumn("Views", format="%d"),
-      "like_count": st.column_config.NumberColumn("Likes", format="%d"),
+      "version_num": st.column_config.NumberColumn("Version", format="%d"),
       "status": "Status",
-      "retrieved_at": "Retrieved At",
+      "recorded_at": "Recorded At",
     },
     hide_index=True,
     width="stretch",
     height=800,
   )
+  connection.close()
+
+elif menu == "Scrapes":
+  st.header("Scrape Operations")
+  st.write("Audit log of all isolated tracking executions.")
+  connection = get_db_connection()
+
+  # Grouping by scrapes
+  scrapes_df = pd.read_sql_query(
+    """
+        SELECT s.id AS scrape_id, s.channel_handle, s.started_at, count(sv.video_id) as videos_touched
+        FROM scrapes s
+        LEFT JOIN scrape_videos sv ON sv.scrape_id = s.id
+        GROUP BY s.id
+        ORDER BY s.started_at DESC
+    """,
+    connection,
+  )
+
+  st.dataframe(scrapes_df, hide_index=True, width="stretch")
   connection.close()
 
 elif menu == "Scraper Controls":
