@@ -1,6 +1,7 @@
 # Environments
 venv/
 .env
+.agents/
 
 # Python caching
 __pycache__/
