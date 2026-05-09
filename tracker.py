@@ -133,25 +133,19 @@ def scrape_channel(handle: str, limit: Optional[int] = None) -> None:
 
       upload_date = entry.get("upload_date", "")
       video_duration = entry.get("duration")
-      video_views = entry.get("view_count")
-      video_likes = entry.get("like_count")
       status = "PUBLIC"
 
       try:
         cursor.execute(
           """INSERT INTO videos
-             (id, channel_handle, published_date, duration_sec, view_count, like_count)
-             VALUES (?, ?, ?, ?, ?, ?)
-             ON CONFLICT(id) DO UPDATE SET
-             view_count=excluded.view_count,
-             like_count=excluded.like_count""",
+             (id, channel_handle, published_date, duration_sec)
+             VALUES (?, ?, ?, ?)
+             ON CONFLICT(id) DO NOTHING""",
           (
             video_id,
             handle,
             upload_date,
             video_duration,
-            video_views,
-            video_likes,
           ),
         )
 
