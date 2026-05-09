@@ -8,7 +8,9 @@ import streamlit as st
 import db
 import tracker
 
-st.set_page_config(page_title="YouTube History Tracker", layout="wide")
+st.set_page_config(
+  page_title="YouTube History Tracker", page_icon="🕵️‍♂️", layout="wide"
+)
 st.title("📹 YouTube History Tracker")
 
 st.sidebar.header("Navigation")
@@ -78,52 +80,57 @@ elif menu == "Channels & Controls":
 elif menu == "History Log":
   st.header("History Log")
 
-  st.subheader("Scrape Operations Log", divider="gray")
-  st.write("Audit log of all tracking executions.")
-  scrapes_df = db.get_scrapes_df()
+  col1, col2 = st.columns([1, 2])
 
-  if scrapes_df.empty:
-    st.info("No scrape operations recorded yet.")
-  else:
-    st.dataframe(scrapes_df, hide_index=True, use_container_width=True)
+  with col1:
+    st.subheader("Scrape Operations Log", divider="gray")
+    st.write("Audit log of all tracking executions.")
+    scrapes_df = db.get_scrapes_df()
 
-    st.subheader("Video Records Filter", divider="gray")
-    formatted_options = ["All Records (Entire History)"] + [
-      f"{row.scrape_id} ({row.started_at})" for row in scrapes_df.itertuples()
-    ]
-
-    selected_option = st.selectbox(
-      "Filter records by scrape:", formatted_options
-    )
-
-    if selected_option == "All Records (Entire History)":
-      st.write(
-        "**Showing all historical records across every scrape execution.**"
-      )
-      videos_df = db.get_video_records_df()
+    if scrapes_df.empty:
+      st.info("No scrape operations recorded yet.")
     else:
-      scrape_id = selected_option.split(" ")[0]
-      st.write(
-        "**Showing distinct video records mapped in scrape execution:** "
-        f"`{scrape_id}`"
-      )
-      videos_df = db.get_scrape_videos_df(scrape_id)
+      st.dataframe(scrapes_df, hide_index=True, use_container_width=True)
 
-    st.dataframe(
-      videos_df,
-      column_config={
-        "thumbnail_url": st.column_config.ImageColumn("Thumbnail"),
-        "video_url": st.column_config.LinkColumn(
-          "Video Link", display_text=r"https://youtube\.com/watch\?v=(.*)"
-        ),
-        "channel_handle": "Channel",
-        "title": "Title",
-        "duration_sec": st.column_config.NumberColumn(
-          "Duration (s)", format="%d"
-        ),
-        "status": "Status",
-      },
-      hide_index=True,
-      use_container_width=True,
-      height=800,
-    )
+  with col2:
+    if not scrapes_df.empty:
+      st.subheader("Video Records Filter", divider="gray")
+      formatted_options = ["All Records (Entire History)"] + [
+        f"{row.scrape_id} ({row.started_at})" for row in scrapes_df.itertuples()
+      ]
+
+      selected_option = st.selectbox(
+        "Filter records by scrape:", formatted_options
+      )
+
+      if selected_option == "All Records (Entire History)":
+        st.write(
+          "**Showing all historical records across every scrape execution.**"
+        )
+        videos_df = db.get_video_records_df()
+      else:
+        scrape_id = selected_option.split(" ")[0]
+        st.write(
+          "**Showing distinct video records mapped in scrape execution:** "
+          f"`{scrape_id}`"
+        )
+        videos_df = db.get_scrape_videos_df(scrape_id)
+
+      st.dataframe(
+        videos_df,
+        column_config={
+          "thumbnail_url": st.column_config.ImageColumn("Thumbnail"),
+          "video_url": st.column_config.LinkColumn(
+            "Video Link", display_text=r"https://youtube\.com/watch\?v=(.*)"
+          ),
+          "channel_handle": "Channel",
+          "title": "Title",
+          "duration_sec": st.column_config.NumberColumn(
+            "Duration (s)", format="%d"
+          ),
+          "status": "Status",
+        },
+        hide_index=True,
+        use_container_width=True,
+        height=700,
+      )
