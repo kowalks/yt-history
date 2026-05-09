@@ -377,7 +377,7 @@ def process_scraped_video(
     cursor.execute(
       """SELECT uuid
          FROM videos
-         WHERE video_id = ? AND title = ? AND description = ?
+         WHERE video_id = ? AND title = ? AND description IS ?
            AND thumbnail_url = ? AND status = ? AND duration_sec = ?""",
       (video_id, title, description, thumbnail, status, duration),
     )
