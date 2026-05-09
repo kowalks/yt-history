@@ -122,7 +122,13 @@ def scrape_channel(handle: str, limit: Optional[int] = None) -> None:
       video_id = entry.get("id")
       video_title = entry.get("title")
       video_desc = entry.get("description", "")
-      video_thumb = entry.get("thumbnail", "")
+
+      thumbnails = entry.get("thumbnails", [])
+      if thumbnails:
+        video_thumb = thumbnails[-1].get("url", "")
+      else:
+        video_thumb = entry.get("thumbnail", "")
+
       upload_date = entry.get("upload_date", "")
       status = "PUBLIC"
 

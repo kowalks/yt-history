@@ -86,6 +86,7 @@ elif menu == "Snapshots":
     },
     hide_index=True,
     width="stretch",
+    height=800,
   )
   connection.close()
 
