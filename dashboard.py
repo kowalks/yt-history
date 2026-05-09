@@ -18,7 +18,7 @@ st.title("📹 YouTube History Tracker")
 st.sidebar.header("Navigation")
 menu = st.sidebar.radio(
   "Go to",
-  ["Dashboard", "Channels", "Video Versions", "Scrapes", "Scraper Controls"],
+  ["Dashboard", "Channels", "Video Records", "Scrapes", "Scraper Controls"],
 )
 
 
@@ -39,13 +39,13 @@ if menu == "Dashboard":
   cursor.execute("SELECT count(*) FROM videos")
   videos_count = cursor.fetchone()[0]
 
-  cursor.execute("SELECT count(*) FROM video_versions")
-  snapshots_count = cursor.fetchone()[0]
+  cursor.execute("SELECT count(*) FROM video_records")
+  records_count = cursor.fetchone()[0]
 
   col1, col2, col3 = st.columns(3)
   col1.metric("Channels Watched", channels_count)
   col2.metric("Videos Tracked", videos_count)
-  col3.metric("Total Video Versions", snapshots_count)
+  col3.metric("Total Video Records", records_count)
 
   connection.close()
 
@@ -56,16 +56,16 @@ elif menu == "Channels":
   st.dataframe(dataframe)
   connection.close()
 
-elif menu == "Video Versions":
-  st.header("Video Versions (History Log)")
+elif menu == "Video Records":
+  st.header("Video Records (History Log)")
   connection = get_db_connection()
   dataframe = pd.read_sql_query(
     """
-        SELECT vv.thumbnail_url, 'https://youtube.com/watch?v=' || vv.video_id AS video_url,
-               v.channel_handle, vv.title, v.duration_sec, vv.version_num, vv.status, vv.created_at AS recorded_at
-        FROM video_versions vv
-        JOIN videos v ON v.id = vv.video_id
-        ORDER BY vv.created_at DESC
+        SELECT vr.thumbnail_url, 'https://youtube.com/watch?v=' || vr.video_id AS video_url,
+               v.channel_handle, vr.title, v.duration_sec, vr.record_id, vr.status, vr.created_at AS recorded_at
+        FROM video_records vr
+        JOIN videos v ON v.id = vr.video_id
+        ORDER BY vr.created_at DESC
     """,
     connection,
   )
@@ -82,7 +82,7 @@ elif menu == "Video Versions":
       "duration_sec": st.column_config.NumberColumn(
         "Duration (s)", format="%d"
       ),
-      "version_num": st.column_config.NumberColumn("Version", format="%d"),
+      "record_id": "Record UUID",
       "status": "Status",
       "recorded_at": "Recorded At",
     },
@@ -97,10 +97,9 @@ elif menu == "Scrapes":
   st.write("Audit log of all isolated tracking executions.")
   connection = get_db_connection()
 
-  # Grouping by scrapes
   scrapes_df = pd.read_sql_query(
     """
-        SELECT s.id AS scrape_id, s.channel_handle, s.started_at, count(sv.video_id) as videos_touched
+        SELECT s.id AS scrape_id, s.channel_handle, s.started_at, count(sv.record_id) as records_touched
         FROM scrapes s
         LEFT JOIN scrape_videos sv ON sv.scrape_id = s.id
         GROUP BY s.id

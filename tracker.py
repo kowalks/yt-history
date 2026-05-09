@@ -29,10 +29,9 @@ def init_db() -> None:
         first_seen_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
 
-    CREATE TABLE IF NOT EXISTS video_versions (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+    CREATE TABLE IF NOT EXISTS video_records (
+        record_id TEXT PRIMARY KEY,
         video_id TEXT,
-        version_num INTEGER,
         title TEXT,
         description TEXT,
         thumbnail_url TEXT,
@@ -49,10 +48,9 @@ def init_db() -> None:
 
     CREATE TABLE IF NOT EXISTS scrape_videos (
         scrape_id TEXT,
-        video_id TEXT,
-        version_num INTEGER,
+        record_id TEXT,
         FOREIGN KEY(scrape_id) REFERENCES scrapes(id),
-        FOREIGN KEY(video_id) REFERENCES videos(id)
+        FOREIGN KEY(record_id) REFERENCES video_records(record_id)
     );
     """)
   connection.commit()
@@ -153,33 +151,27 @@ def scrape_channel(handle: str, limit: Optional[int] = None) -> None:
         )
 
         cursor.execute(
-          """SELECT version_num
-             FROM video_versions
+          """SELECT record_id
+             FROM video_records
              WHERE video_id = ? AND title = ? AND description = ? AND thumbnail_url = ? AND status = ?
              LIMIT 1""",
           (video_id, video_title, video_desc, video_thumb, status),
         )
-        existing_version = cursor.fetchone()
+        existing_record = cursor.fetchone()
 
-        if existing_version:
-          version_num = existing_version[0]
+        if existing_record:
+          record_id = existing_record[0]
         else:
-          cursor.execute(
-            "SELECT MAX(version_num) FROM video_versions WHERE video_id = ?",
-            (video_id,),
-          )
-          max_v = cursor.fetchone()[0]
-          version_num = (max_v or 0) + 1
-
+          record_id = str(uuid.uuid4())
           print(
-            f"New version ({version_num}) saved for video: {video_id} - '{video_title}'"
+            f"New record ({record_id}) saved for video: {video_id} - '{video_title}'"
           )
           cursor.execute(
-            """INSERT INTO video_versions (video_id, version_num, title, description, thumbnail_url, status)
+            """INSERT INTO video_records (record_id, video_id, title, description, thumbnail_url, status)
                VALUES (?, ?, ?, ?, ?, ?)""",
             (
+              record_id,
               video_id,
-              version_num,
               video_title,
               video_desc,
               video_thumb,
@@ -188,8 +180,8 @@ def scrape_channel(handle: str, limit: Optional[int] = None) -> None:
           )
 
         cursor.execute(
-          "INSERT INTO scrape_videos (scrape_id, video_id, version_num) VALUES (?, ?, ?)",
-          (scrape_id, video_id, version_num),
+          "INSERT INTO scrape_videos (scrape_id, record_id) VALUES (?, ?)",
+          (scrape_id, record_id),
         )
 
         connection.commit()
