@@ -31,6 +31,9 @@ def init_db() -> None:
         id TEXT PRIMARY KEY,
         channel_handle TEXT,
         published_date TEXT,
+        duration_sec INTEGER,
+        view_count INTEGER,
+        like_count INTEGER,
         first_seen_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
 
@@ -126,16 +129,30 @@ def scrape_channel(handle: str, limit: Optional[int] = None) -> None:
       thumbnails = entry.get("thumbnails", [])
       if thumbnails:
         video_thumb = thumbnails[-1].get("url", "")
-      else:
-        video_thumb = entry.get("thumbnail", "")
+      video_thumb = entry.get("thumbnail", "")
 
       upload_date = entry.get("upload_date", "")
+      video_duration = entry.get("duration")
+      video_views = entry.get("view_count")
+      video_likes = entry.get("like_count")
       status = "PUBLIC"
 
       try:
         cursor.execute(
-          "INSERT OR IGNORE INTO videos (id, channel_handle, published_date) VALUES (?, ?, ?)",
-          (video_id, handle, upload_date),
+          """INSERT INTO videos
+             (id, channel_handle, published_date, duration_sec, view_count, like_count)
+             VALUES (?, ?, ?, ?, ?, ?)
+             ON CONFLICT(id) DO UPDATE SET
+             view_count=excluded.view_count,
+             like_count=excluded.like_count""",
+          (
+            video_id,
+            handle,
+            upload_date,
+            video_duration,
+            video_views,
+            video_likes,
+          ),
         )
 
         cursor.execute(
