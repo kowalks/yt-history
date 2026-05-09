@@ -81,10 +81,25 @@ def show():
   st.divider()
   with st.expander("☢️ Danger Zone"):
     st.warning("This will permanently delete all channels, videos, and scrape history.")
-    if st.button("Purge All Data & Reset Database", type="primary"):
-      db.reset_db()
-      st.success("Database has been reset!")
-      st.rerun()
+    
+    if "confirm_reset" not in st.session_state:
+        st.session_state.confirm_reset = False
+
+    if not st.session_state.confirm_reset:
+        if st.button("Purge All Data & Reset Database", type="primary"):
+            st.session_state.confirm_reset = True
+            st.rerun()
+    else:
+        st.error("🚨 ARE YOU ABSOLUTELY SURE? This operation is irreversible.")
+        col_c1, col_c2 = st.columns(2)
+        if col_c1.button("🔥 YES, RESET EVERYTHING", type="primary", use_container_width=True):
+            db.reset_db()
+            st.session_state.confirm_reset = False
+            st.success("Database has been reset!")
+            st.rerun()
+        if col_c2.button("❌ No, cancel", use_container_width=True):
+            st.session_state.confirm_reset = False
+            st.rerun()
 
 
 if __name__ == "__main__":

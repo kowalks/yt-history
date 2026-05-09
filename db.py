@@ -206,19 +206,19 @@ def get_video_records_df() -> pd.DataFrame:
 
 
 def get_scrapes_df() -> pd.DataFrame:
-  """Returns a DataFrame of scrape audit events with channel counts."""
+  """Returns a detailed log of every channel-scrape event."""
   connection = get_connection()
   df = pd.read_sql_query(
     """
-    SELECT
-        s.id AS scrape_id,
-        s.started_at,
-        s.status,
-        s.total_videos,
-        s.new_records,
-        (SELECT COUNT(*) FROM scrape_channels sc
-         WHERE sc.scrape_id = s.id) as channels_count
-    FROM scrapes s
+    SELECT 
+        sc.scrape_id,
+        c.name as channel_name,
+        sc.video_count,
+        sc.status as channel_status,
+        s.started_at
+    FROM scrape_channels sc
+    JOIN scrapes s ON sc.scrape_id = s.id
+    JOIN channels c ON sc.channel_uuid = c.uuid
     ORDER BY s.started_at DESC
     """,
     connection,

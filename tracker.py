@@ -42,13 +42,21 @@ def scrape_channel(handle: str, limit: Optional[int] = None, scrape_uuid: Option
         for entry in entries:
             if not entry:
                 continue
+            
+            video_id = entry.get("id")
+            thumbnail_url = entry.get("thumbnail")
+            
+            # Fallback for flat extraction missing thumbnails
+            if not thumbnail_url and video_id:
+                thumbnail_url = f"https://i.ytimg.com/vi/{video_id}/hqdefault.jpg"
+
             db.process_scraped_video(
                 scrape_id=scrape_uuid,
                 handle=handle,
-                video_id=entry.get("id"),
+                video_id=video_id,
                 title=entry.get("title"),
                 description=entry.get("description"),
-                thumbnail=entry.get("thumbnail"),
+                thumbnail=thumbnail_url,
                 upload_date=entry.get("upload_date"),
                 duration=entry.get("duration"),
                 record_uuid=str(uuid.uuid4()),
