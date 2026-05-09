@@ -81,10 +81,21 @@ def init_db() -> None:
 
 
 def reset_db() -> None:
-  """Wipes the database file and re-initializes from scratch."""
-  print("⚠️ Purging all data and resetting database...")
-  if os.path.exists(DB_FILE):
-    os.remove(DB_FILE)
+  """Drops all tables and re-initializes from scratch."""
+  print("⚠️ Purging all data by dropping tables...")
+  connection = get_connection()
+  cursor = connection.cursor()
+  cursor.executescript("""
+    PRAGMA foreign_keys = OFF;
+    DROP TABLE IF EXISTS scrape_videos;
+    DROP TABLE IF EXISTS scrape_channels;
+    DROP TABLE IF EXISTS scrapes;
+    DROP TABLE IF EXISTS videos;
+    DROP TABLE IF EXISTS channels;
+    PRAGMA foreign_keys = ON;
+  """)
+  connection.commit()
+  connection.close()
   init_db()
   print("♻️ Database reset completed.")
 
