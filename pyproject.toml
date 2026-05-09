@@ -1,0 +1,30 @@
+[project]
+name = "youtube-history-tracker"
+version = "0.1.0"
+description = "YouTube history and metadata tracking utility."
+requires-python = ">=3.9"
+dependencies = [
+  "yt-dlp",
+  "sqlite-utils",
+  "streamlit",
+  "pandas"
+]
+
+[tool.ruff]
+indent-width = 2
+line-length = 80
+
+[tool.ruff.lint]
+select = [
+  "E",  # pycodestyle errors
+  "W",  # pycodestyle warnings
+  "F",  # pyflakes
+  "I",  # isort
+  "B",  # flake8-bugbear
+  "C4", # flake8-comprehensions
+  "UP", # pyupgrade
+]
+
+[tool.ruff.format]
+indent-style = "space"
+quote-style = "double"

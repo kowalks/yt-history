@@ -1,7 +1,20 @@
+# Environments
 venv/
+.env
+
+# Python caching
 __pycache__/
+*.pyc
+
+# Database
 *.sqlite3
 *.db
-.DS_Store
-.env
+
+# Logs
 *.log
+
+# IDE
+.vscode/
+
+# OS
+.DS_Store
