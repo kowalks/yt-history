@@ -1,77 +1,15 @@
 """YouTube History Tracker module for scraping metadata."""
 
-import sqlite3
 import uuid
 from typing import Optional
 
 import yt_dlp
 
-DB_FILE = "history.db"
-
-
-def init_db() -> None:
-  """Initializes the SQLite database with necessary tables."""
-  connection = sqlite3.connect(DB_FILE)
-  cursor = connection.cursor()
-  cursor.executescript("""
-    CREATE TABLE IF NOT EXISTS channels (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT,
-        handle TEXT UNIQUE,
-        added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE TABLE IF NOT EXISTS videos (
-        id TEXT PRIMARY KEY,
-        channel_handle TEXT,
-        published_date TEXT,
-        duration_sec INTEGER,
-        first_seen_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE TABLE IF NOT EXISTS video_records (
-        record_id TEXT PRIMARY KEY,
-        video_id TEXT,
-        title TEXT,
-        description TEXT,
-        thumbnail_url TEXT,
-        status TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY(video_id) REFERENCES videos(id)
-    );
-
-    CREATE TABLE IF NOT EXISTS scrapes (
-        id TEXT PRIMARY KEY,
-        channel_handle TEXT,
-        started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE TABLE IF NOT EXISTS scrape_videos (
-        scrape_id TEXT,
-        record_id TEXT,
-        FOREIGN KEY(scrape_id) REFERENCES scrapes(id),
-        FOREIGN KEY(record_id) REFERENCES video_records(record_id)
-    );
-    """)
-  connection.commit()
-  connection.close()
-
-
-def add_channel(handle: str) -> None:
-  """Adds a new YouTube channel to track."""
-  connection = sqlite3.connect(DB_FILE)
-  cursor = connection.cursor()
-  try:
-    cursor.execute("INSERT INTO channels (handle) VALUES (?)", (handle,))
-    connection.commit()
-    print(f"Added channel: {handle}")
-  except sqlite3.IntegrityError:
-    print(f"Channel {handle} already exists.")
-  connection.close()
+import db
 
 
 def scrape_channel(handle: str, limit: Optional[int] = None) -> None:
-  """Scrapes video metadata for the given channel handle."""
+  """Scrapes video metadata for the given channel handle utilizing the DB API."""
   url = f"https://www.youtube.com/{handle}/videos"
 
   ydl_opts = {
@@ -104,19 +42,10 @@ def scrape_channel(handle: str, limit: Optional[int] = None) -> None:
       or handle
     )
 
-    connection = sqlite3.connect(DB_FILE)
-    cursor = connection.cursor()
-
-    cursor.execute(
-      "UPDATE channels SET name = ? WHERE handle = ?", (channel_name, handle)
-    )
+    db.update_channel_name(handle, channel_name)
 
     scrape_id = str(uuid.uuid4())
-    cursor.execute(
-      "INSERT INTO scrapes (id, channel_handle) VALUES (?, ?)",
-      (scrape_id, handle),
-    )
-    connection.commit()
+    db.insert_scrape_event(scrape_id, handle)
 
     for entry in entries:
       if not entry:
@@ -134,65 +63,23 @@ def scrape_channel(handle: str, limit: Optional[int] = None) -> None:
 
       upload_date = entry.get("upload_date", "")
       video_duration = entry.get("duration")
-      status = "PUBLIC"
 
-      try:
-        cursor.execute(
-          """INSERT INTO videos
-             (id, channel_handle, published_date, duration_sec)
-             VALUES (?, ?, ?, ?)
-             ON CONFLICT(id) DO NOTHING""",
-          (
-            video_id,
-            handle,
-            upload_date,
-            video_duration,
-          ),
-        )
-
-        cursor.execute(
-          """SELECT record_id
-             FROM video_records
-             WHERE video_id = ? AND title = ? AND description = ? AND thumbnail_url = ? AND status = ?
-             LIMIT 1""",
-          (video_id, video_title, video_desc, video_thumb, status),
-        )
-        existing_record = cursor.fetchone()
-
-        if existing_record:
-          record_id = existing_record[0]
-        else:
-          record_id = str(uuid.uuid4())
-          print(
-            f"New record ({record_id}) saved for video: {video_id} - '{video_title}'"
-          )
-          cursor.execute(
-            """INSERT INTO video_records (record_id, video_id, title, description, thumbnail_url, status)
-               VALUES (?, ?, ?, ?, ?, ?)""",
-            (
-              record_id,
-              video_id,
-              video_title,
-              video_desc,
-              video_thumb,
-              status,
-            ),
-          )
-
-        cursor.execute(
-          "INSERT INTO scrape_videos (scrape_id, record_id) VALUES (?, ?)",
-          (scrape_id, record_id),
-        )
-
-        connection.commit()
-      except sqlite3.DatabaseError as db_error:
-        print(f"Database error for video {video_id}: {db_error}")
-
-    connection.close()
+      new_record_uuid = str(uuid.uuid4())
+      db.process_scraped_video(
+        scrape_id,
+        handle,
+        video_id,
+        video_title,
+        video_desc,
+        video_thumb,
+        upload_date,
+        video_duration,
+        new_record_uuid,
+      )
 
 
 if __name__ == "__main__":
-  init_db()
+  db.init_db()
   test_handle = "@PrimoRico"
-  add_channel(test_handle)
+  db.add_channel(test_handle)
   scrape_channel(test_handle)

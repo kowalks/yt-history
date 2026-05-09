@@ -1,16 +1,12 @@
 """Streamlit dashboard for YouTube History Tracker.
 
-This module processes sqlite data and launches the dashboard application.
+This module renders the frontend relying on the internal db API.
 """
 
-import sqlite3
-
-import pandas as pd
 import streamlit as st
 
+import db
 import tracker
-
-DB_FILE = "history.db"
 
 st.set_page_config(page_title="YouTube History Tracker", layout="wide")
 st.title("📹 YouTube History Tracker")
@@ -21,54 +17,25 @@ menu = st.sidebar.radio(
   ["Dashboard", "Channels", "Video Records", "Scrapes", "Scraper Controls"],
 )
 
-
-def get_db_connection() -> sqlite3.Connection:
-  """Creates and returns a connection to the SQLite history database."""
-  return sqlite3.connect(DB_FILE)
-
-
 if menu == "Dashboard":
   st.header("Overview")
   st.write("Welcome to the YouTube History Tracker Prototype.")
-  connection = get_db_connection()
-  cursor = connection.cursor()
 
-  cursor.execute("SELECT count(*) FROM channels")
-  channels_count = cursor.fetchone()[0]
-
-  cursor.execute("SELECT count(*) FROM videos")
-  videos_count = cursor.fetchone()[0]
-
-  cursor.execute("SELECT count(*) FROM video_records")
-  records_count = cursor.fetchone()[0]
+  stats = db.get_stats()
 
   col1, col2, col3 = st.columns(3)
-  col1.metric("Channels Watched", channels_count)
-  col2.metric("Videos Tracked", videos_count)
-  col3.metric("Total Video Records", records_count)
-
-  connection.close()
+  col1.metric("Channels Watched", stats["channels"])
+  col2.metric("Videos Tracked", stats["videos"])
+  col3.metric("Total Video Records", stats["records"])
 
 elif menu == "Channels":
   st.header("Channels")
-  connection = get_db_connection()
-  dataframe = pd.read_sql_query("SELECT * FROM channels", connection)
+  dataframe = db.get_channels_df()
   st.dataframe(dataframe)
-  connection.close()
 
 elif menu == "Video Records":
   st.header("Video Records (History Log)")
-  connection = get_db_connection()
-  dataframe = pd.read_sql_query(
-    """
-        SELECT vr.thumbnail_url, 'https://youtube.com/watch?v=' || vr.video_id AS video_url,
-               v.channel_handle, vr.title, v.duration_sec, vr.record_id, vr.status, vr.created_at AS recorded_at
-        FROM video_records vr
-        JOIN videos v ON v.id = vr.video_id
-        ORDER BY vr.created_at DESC
-    """,
-    connection,
-  )
+  dataframe = db.get_video_records_df()
 
   st.dataframe(
     dataframe,
@@ -90,26 +57,13 @@ elif menu == "Video Records":
     width="stretch",
     height=800,
   )
-  connection.close()
 
 elif menu == "Scrapes":
   st.header("Scrape Operations")
   st.write("Audit log of all isolated tracking executions.")
-  connection = get_db_connection()
 
-  scrapes_df = pd.read_sql_query(
-    """
-        SELECT s.id AS scrape_id, s.channel_handle, s.started_at, count(sv.record_id) as records_touched
-        FROM scrapes s
-        LEFT JOIN scrape_videos sv ON sv.scrape_id = s.id
-        GROUP BY s.id
-        ORDER BY s.started_at DESC
-    """,
-    connection,
-  )
-
+  scrapes_df = db.get_scrapes_df()
   st.dataframe(scrapes_df, hide_index=True, width="stretch")
-  connection.close()
 
 elif menu == "Scraper Controls":
   st.header("Scraper Controls")
@@ -121,19 +75,14 @@ elif menu == "Scraper Controls":
   new_handle = st.text_input("YouTube Handle (e.g., @mkbhd)")
   if st.button("Add Channel"):
     if new_handle:
-      tracker.add_channel(new_handle)
+      db.add_channel(new_handle)
       st.success(f"Added {new_handle} to the database. You can now scrape it!")
     else:
       st.error("Please enter a valid YouTube handle.")
 
   st.subheader("2. Trigger Scraping Action", divider="gray")
-  connection = get_db_connection()
-  channels_df = pd.read_sql_query(
-    "SELECT handle, name FROM channels", connection
-  )
-  connection.close()
-
-  handles_list = channels_df["handle"].tolist()
+  channels_df = db.get_channels_df()
+  handles_list = channels_df["handle"].tolist() if not channels_df.empty else []
 
   if not handles_list:
     st.warning("No channels active. Add a channel above first.")
