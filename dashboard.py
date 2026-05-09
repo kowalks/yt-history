@@ -8,13 +8,16 @@ import sqlite3
 import pandas as pd
 import streamlit as st
 
+import tracker
+
 DB_FILE = "history.db"
 
 st.set_page_config(page_title="YouTube History Tracker", layout="wide")
 st.title("📹 YouTube History Tracker")
 
 st.sidebar.header("Navigation")
-menu = st.sidebar.radio("Go to", ["Dashboard", "Channels", "Snapshots"])
+menu = st.sidebar.radio(
+    "Go to", ["Dashboard", "Channels", "Snapshots", "Scraper Controls"])
 
 
 def get_db_connection() -> sqlite3.Connection:
