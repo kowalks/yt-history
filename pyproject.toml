@@ -2,12 +2,15 @@
 name = "youtube-history-tracker"
 version = "0.1.0"
 description = "YouTube history and metadata tracking utility."
-requires-python = ">=3.9"
+readme = "DESIGN_DOC.md"
+requires-python = ">=3.14"
 dependencies = [
-  "yt-dlp",
-  "sqlite-utils",
-  "streamlit",
-  "pandas"
+    "imagehash>=4.3.2",
+    "pandas>=3.0.2",
+    "ruff>=0.15.12",
+    "sqlite-utils>=3.39",
+    "streamlit>=1.57.0",
+    "yt-dlp>=2026.3.17",
 ]
 
 [tool.ruff]
