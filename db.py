@@ -20,6 +20,7 @@ def get_connection() -> sqlite3.Connection:
 
 def init_db() -> None:
   """Initializes the database schema."""
+  print(f"🗄️ Initializing database at {DB_FILE}...")
   connection = get_connection()
   cursor = connection.cursor()
   cursor.executescript("""
@@ -76,13 +77,16 @@ def init_db() -> None:
   """)
   connection.commit()
   connection.close()
+  print("✅ Database initialized successfully.")
 
 
 def reset_db() -> None:
   """Wipes the database file and re-initializes from scratch."""
+  print("⚠️ Purging all data and resetting database...")
   if os.path.exists(DB_FILE):
     os.remove(DB_FILE)
   init_db()
+  print("♻️ Database reset completed.")
 
 
 def add_channel(handle: str, name: Optional[str] = None) -> None:
