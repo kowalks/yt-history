@@ -249,6 +249,7 @@ def get_scrape_videos_df(scrape_id: str) -> pd.DataFrame:
 
 def start_scrape_session(scrape_id: str) -> None:
   """Registers a new multi-channel scrape session."""
+  print(f"🚀 Starting scrape session: {scrape_id}")
   connection = get_connection()
   cursor = connection.cursor()
   cursor.execute(
@@ -263,6 +264,7 @@ def log_channel_scrape_result(
   scrape_id: str, handle: str, status: str, video_count: int
 ) -> None:
   """Logs the outcome of a specific channel's scrape within a session."""
+  print(f"  ∟ {handle}: {status} ({video_count} videos)")
   connection = get_connection()
   cursor = connection.cursor()
   try:
@@ -326,6 +328,9 @@ def process_scraped_video(
       count = cursor.fetchone()[0]
       is_change = 1 if count > 0 else 0
       final_uuid = record_uuid
+
+      if is_change:
+        print(f"    ⚠️ Change detected for video: {video_id} ({title[:30]}...)")
 
       cursor.execute(
         """INSERT INTO videos
@@ -414,3 +419,5 @@ def finalize_scrape(scrape_id: str, status: str = "SUCCESS") -> None:
   )
   connection.commit()
   connection.close()
+  print(f"🏁 Scrape session {scrape_id} finalized: {status}")
+  print(f"   📊 Total: {total or 0} videos | Changes detected: {changes or 0}")
