@@ -69,13 +69,14 @@ def scrape_channel(handle, limit=10):
             return
             
         entries = info.get('entries', [])
-        channel_name = info.get('channel', handle)
+        channel_name = info.get('uploader') or info.get('playlist_uploader') or info.get('channel') or handle
         
         conn = sqlite3.connect(DB_FILE)
         c = conn.cursor()
         
         # Update channel name
         c.execute("UPDATE channels SET name = ? WHERE handle = ?", (channel_name, handle))
+        conn.commit()
         
         for entry in entries:
             if not entry:
@@ -87,34 +88,37 @@ def scrape_channel(handle, limit=10):
             upload_date = entry.get('upload_date', '') 
             status = 'PUBLIC' 
             
-            # Insert into videos if not exists
-            c.execute("INSERT OR IGNORE INTO videos (id, channel_handle, published_date) VALUES (?, ?, ?)", 
-                      (v_id, handle, upload_date))
-            
-            # Check latest snapshot
-            c.execute("""SELECT title, description, thumbnail_url, status 
-                         FROM video_snapshots 
-                         WHERE video_id = ? 
-                         ORDER BY retrieved_at DESC LIMIT 1""", (v_id,))
-            latest = c.fetchone()
-            
-            changed = False
-            if not latest:
-                changed = True
-            else:
-                if (latest[0] != v_title or 
-                    latest[1] != v_desc or 
-                    latest[2] != v_thumb or 
-                    latest[3] != status):
+            try:
+                # Insert into videos if not exists
+                c.execute("INSERT OR IGNORE INTO videos (id, channel_handle, published_date) VALUES (?, ?, ?)", 
+                          (v_id, handle, upload_date))
+                
+                # Check latest snapshot
+                c.execute("""SELECT title, description, thumbnail_url, status 
+                             FROM video_snapshots 
+                             WHERE video_id = ? 
+                             ORDER BY retrieved_at DESC LIMIT 1""", (v_id,))
+                latest = c.fetchone()
+                
+                changed = False
+                if not latest:
                     changed = True
-            
-            if changed:
-                print(f"New snapshot saved for video: {v_id} - '{v_title}'")
-                c.execute("""INSERT INTO video_snapshots (video_id, title, description, thumbnail_url, status) 
-                             VALUES (?, ?, ?, ?, ?)""", 
-                          (v_id, v_title, v_desc, v_thumb, status))
-        
-        conn.commit()
+                else:
+                    if (latest[0] != v_title or 
+                        latest[1] != v_desc or 
+                        latest[2] != v_thumb or 
+                        latest[3] != status):
+                        changed = True
+                
+                if changed:
+                    print(f"New snapshot saved for video: {v_id} - '{v_title}'")
+                    c.execute("""INSERT INTO video_snapshots (video_id, title, description, thumbnail_url, status) 
+                                 VALUES (?, ?, ?, ?, ?)""", 
+                              (v_id, v_title, v_desc, v_thumb, status))
+                conn.commit()
+            except Exception as e:
+                print(f"Database error for video {v_id}: {e}")
+                
         conn.close()
 
 if __name__ == "__main__":
