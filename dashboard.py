@@ -63,7 +63,46 @@ elif menu == "Scrapes":
   st.write("Audit log of all isolated tracking executions.")
 
   scrapes_df = db.get_scrapes_df()
-  st.dataframe(scrapes_df, hide_index=True, width="stretch")
+
+  if not scrapes_df.empty:
+    st.dataframe(scrapes_df, hide_index=True, width="stretch")
+
+    st.divider()
+    st.subheader("Inspect Scrape Details")
+
+    formatted_options = [
+      f"{row.scrape_id} ({row.started_at})" for row in scrapes_df.itertuples()
+    ]
+
+    selected_option = st.selectbox("Select Scrape Operation", formatted_options)
+
+    if selected_option:
+      scrape_id = selected_option.split(" ")[0]
+      videos_df = db.get_scrape_videos_df(scrape_id)
+
+      st.write(
+        f"Showing distinct video records mapped in scrape execution: **{scrape_id}**"
+      )
+      st.dataframe(
+        videos_df,
+        column_config={
+          "thumbnail_url": st.column_config.ImageColumn("Thumbnail"),
+          "video_url": st.column_config.LinkColumn(
+            "Video Link", display_text=r"https://youtube\.com/watch\?v=(.*)"
+          ),
+          "channel_handle": "Channel",
+          "title": "Title",
+          "duration_sec": st.column_config.NumberColumn(
+            "Duration (s)", format="%d"
+          ),
+          "status": "Status",
+        },
+        hide_index=True,
+        width="stretch",
+        height=600,
+      )
+  else:
+    st.info("No scrape operations recorded yet.")
 
 elif menu == "Scraper Controls":
   st.header("Scraper Controls")

@@ -136,6 +136,25 @@ def get_scrapes_df() -> pd.DataFrame:
   return df
 
 
+def get_scrape_videos_df(scrape_id: str) -> pd.DataFrame:
+  """Retrieve all video records tied to an explicit scrape execution."""
+  connection = get_connection()
+  df = pd.read_sql_query(
+    """
+    SELECT vr.thumbnail_url, 'https://youtube.com/watch?v=' || vr.video_id AS video_url,
+           v.channel_handle, vr.title, v.duration_sec, vr.status
+    FROM scrape_videos sv
+    JOIN video_records vr ON sv.record_id = vr.record_id
+    JOIN videos v ON vr.video_id = v.id
+    WHERE sv.scrape_id = ?
+    """,
+    connection,
+    params=(scrape_id,),
+  )
+  connection.close()
+  return df
+
+
 def insert_scrape_event(scrape_id: str, handle: str) -> None:
   """Registers a new scrape session trigger."""
   connection = get_connection()

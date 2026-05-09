@@ -17,6 +17,8 @@ def scrape_channel(handle: str, limit: Optional[int] = None) -> None:
     "skip_download": True,
     "quiet": True,
     "no_warnings": True,
+    "extractor_args": {"youtube": ["lang=pt"]},
+    "http_headers": {"Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7"},
   }
 
   if limit is not None:
