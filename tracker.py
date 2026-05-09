@@ -32,8 +32,6 @@ def init_db() -> None:
         channel_handle TEXT,
         published_date TEXT,
         duration_sec INTEGER,
-        view_count INTEGER,
-        like_count INTEGER,
         first_seen_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
 
@@ -127,9 +125,11 @@ def scrape_channel(handle: str, limit: Optional[int] = None) -> None:
       video_desc = entry.get("description", "")
 
       thumbnails = entry.get("thumbnails", [])
-      if thumbnails:
-        video_thumb = thumbnails[-1].get("url", "")
-      video_thumb = entry.get("thumbnail", "")
+      video_thumb = (
+        thumbnails[-1].get("url", "")
+        if thumbnails
+        else entry.get("thumbnail", "")
+      )
 
       upload_date = entry.get("upload_date", "")
       video_duration = entry.get("duration")

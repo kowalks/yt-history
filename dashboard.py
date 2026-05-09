@@ -65,7 +65,7 @@ elif menu == "Snapshots":
   dataframe = pd.read_sql_query(
     """
         SELECT vs.thumbnail_url, 'https://youtube.com/watch?v=' || vs.video_id AS video_url,
-               v.channel_handle, vs.title, v.duration_sec, v.view_count, v.like_count, vs.status, vs.retrieved_at
+               v.channel_handle, vs.title, v.duration_sec, vs.status, vs.retrieved_at
         FROM video_snapshots vs
         JOIN videos v ON v.id = vs.video_id
         ORDER BY vs.retrieved_at DESC
