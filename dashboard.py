@@ -64,7 +64,8 @@ elif menu == "Channels & Controls":
 
       if selected_option == "All Channels":
         with st.spinner(
-          "Scraping all registered channels... This may take a while depending on limits."
+          "Scraping all registered channels... "
+          "This may take a while depending on limits."
         ):
           for h in handles_list:
             tracker.scrape_channel(h, limit=final_limit)
@@ -103,7 +104,8 @@ elif menu == "History Log":
     else:
       scrape_id = selected_option.split(" ")[0]
       st.write(
-        f"**Showing distinct video records mapped in scrape execution:** `{scrape_id}`"
+        "**Showing distinct video records mapped in scrape execution:** "
+        f"`{scrape_id}`"
       )
       videos_df = db.get_scrape_videos_df(scrape_id)
 

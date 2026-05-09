@@ -107,8 +107,9 @@ def get_video_records_df() -> pd.DataFrame:
   connection = get_connection()
   df = pd.read_sql_query(
     """
-    SELECT vr.thumbnail_url, 'https://youtube.com/watch?v=' || vr.video_id AS video_url,
-           v.channel_handle, vr.title, v.duration_sec, vr.record_id, vr.status, vr.created_at AS recorded_at
+    SELECT vr.thumbnail_url, 'https://youtube.com/watch?v=' || vr.video_id AS
+           video_url, v.channel_handle, vr.title, v.duration_sec, vr.record_id,
+           vr.status, vr.created_at AS recorded_at
     FROM video_records vr
     JOIN videos v ON v.id = vr.video_id
     ORDER BY vr.created_at DESC
@@ -124,7 +125,8 @@ def get_scrapes_df() -> pd.DataFrame:
   connection = get_connection()
   df = pd.read_sql_query(
     """
-    SELECT s.id AS scrape_id, s.channel_handle, s.started_at, count(sv.record_id) as records_touched
+    SELECT s.id AS scrape_id, s.channel_handle, s.started_at,
+           count(sv.record_id) as records_touched
     FROM scrapes s
     LEFT JOIN scrape_videos sv ON sv.scrape_id = s.id
     GROUP BY s.id
@@ -141,8 +143,8 @@ def get_scrape_videos_df(scrape_id: str) -> pd.DataFrame:
   connection = get_connection()
   df = pd.read_sql_query(
     """
-    SELECT vr.thumbnail_url, 'https://youtube.com/watch?v=' || vr.video_id AS video_url,
-           v.channel_handle, vr.title, v.duration_sec, vr.status
+    SELECT vr.thumbnail_url, 'https://youtube.com/watch?v=' || vr.video_id AS
+           video_url, v.channel_handle, vr.title, v.duration_sec, vr.status
     FROM scrape_videos sv
     JOIN video_records vr ON sv.record_id = vr.record_id
     JOIN videos v ON vr.video_id = v.id
@@ -195,7 +197,8 @@ def process_scraped_video(
     cursor.execute(
       """SELECT record_id
          FROM video_records
-         WHERE video_id = ? AND title = ? AND description = ? AND thumbnail_url = ? AND status = ?
+         WHERE video_id = ? AND title = ? AND description = ? AND
+               thumbnail_url = ? AND status = ?
          LIMIT 1""",
       (video_id, title, description, thumbnail, status),
     )
@@ -206,7 +209,8 @@ def process_scraped_video(
     else:
       final_record_id = record_uuid
       cursor.execute(
-        """INSERT INTO video_records (record_id, video_id, title, description, thumbnail_url, status)
+        """INSERT INTO video_records (record_id, video_id, title, description,
+           thumbnail_url, status)
            VALUES (?, ?, ?, ?, ?, ?)""",
         (final_record_id, video_id, title, description, thumbnail, status),
       )

@@ -9,7 +9,7 @@ import db
 
 
 def scrape_channel(handle: str, limit: Optional[int] = None) -> None:
-  """Scrapes video metadata for the given channel handle utilizing the DB API."""
+  """Scrapes video metadata for the given handle utilizing the DB API."""
   url = f"https://www.youtube.com/{handle}/videos"
 
   ydl_opts = {
@@ -27,7 +27,8 @@ def scrape_channel(handle: str, limit: Optional[int] = None) -> None:
   with yt_dlp.YoutubeDL(ydl_opts) as ydl:
     limit_str = f"limit {limit}" if limit else "all videos"
     print(
-      f"Fetching metadata for {handle}/videos ({limit_str}). This may take a while..."
+      f"Fetching metadata for {handle}/videos ({limit_str}). "
+      "This may take a while..."
     )
 
     try:
